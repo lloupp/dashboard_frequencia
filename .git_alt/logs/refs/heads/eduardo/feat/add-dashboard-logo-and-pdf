@@ -3,3 +3,4 @@ a99cfef245a4bc14afe96978ce99761dd1eab8ce 846e2b7ebeeb59f93b923f73fb2ebd484da469a
 846e2b7ebeeb59f93b923f73fb2ebd484da469a2 a4674022810510f260ca2ef6b863bca92b5c3b45 Eduardo Dantas <eduardo.dantas@local> 1775674460 -0300	commit: style: Match institutional header layout in generated HTML
 a4674022810510f260ca2ef6b863bca92b5c3b45 7c0856b2fbd3dc9d342ace0b7f3c3347abfc9576 Eduardo Dantas <eduardo.dantas@local> 1775674548 -0300	commit: fix: Infer attendance columns when generating PDFs
 7c0856b2fbd3dc9d342ace0b7f3c3347abfc9576 5ff877e15a9d77e4876f0a4db6362ae6d394f4a3 Eduardo Dantas <eduardo.dantas@local> 1775674643 -0300	commit: style: Reduce header logo size in generated dashboard
+5ff877e15a9d77e4876f0a4db6362ae6d394f4a3 042927bfbb43b46bb93b2ec1731f62b2d9036fe1 Eduardo Dantas <eduardo.dantas@local> 1775676697 -0300	commit: docs: Add README for Streamlit Cloud deployment
