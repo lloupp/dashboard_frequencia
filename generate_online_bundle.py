@@ -123,10 +123,16 @@ def generate_dashboard_artifacts(file_bytes: bytes) -> tuple[dict[str, object], 
 def render_html(payload: dict[str, object]) -> str:
     payload_json = json.dumps(payload, ensure_ascii=False)
 
-    header_image = _asset_data_url(ASSETS_DIR / "header.png") or _asset_data_url(ASSETS_DIR / "header.jpg")
+    header_image = (
+        _asset_data_url(ASSETS_DIR / "header.png")
+        or _asset_data_url(ASSETS_DIR / "header.jpg")
+        or _asset_data_url(ROOT / "santa_ufcspa.png")
+        or _asset_data_url(ROOT / "santa_ufcspa.jpg")
+        or _asset_data_url(ASSETS_DIR / "santa_ufcspa.png")
+        or _asset_data_url(ASSETS_DIR / "santa_ufcspa.jpg")
+    )
     logo_left = _asset_data_url(ASSETS_DIR / "santa_casa.png") or _asset_data_url(ASSETS_DIR / "santa_casa.jpg")
     logo_right = _asset_data_url(ASSETS_DIR / "ufcspa.png") or _asset_data_url(ASSETS_DIR / "ufcspa.jpg")
-    center_logo = _asset_data_url(ROOT / "santa_ufcspa.png") or _asset_data_url(ASSETS_DIR / "santa_ufcspa.png")
 
     header_visual = ""
     if header_image:
@@ -141,16 +147,11 @@ def render_html(payload: dict[str, object]) -> str:
     header_html = f"""
     <header class="org-header" aria-label="Cabeçalho institucional">
       {header_visual}
-      <div class="org-header-strip">UFCSPA / SANTA CASA DE PORTO ALEGRE</div>
+      <div class="org-header-strip">
+        <div class="org-strip-title">UFCSPA / SANTA CASA DE PORTO ALEGRE</div>
+        <div class="org-strip-subtitle">Pós-Médica — Programa de Especialização Médica</div>
+      </div>
     </header>
-    """
-
-    center_logo_html = ""
-    if center_logo:
-        center_logo_html = f"""
-    <div class="center-logo" aria-label="Logo institucional">
-      <img src="{center_logo}" alt="Santa Casa e UFCSPA" />
-    </div>
     """
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -218,21 +219,16 @@ def render_html(payload: dict[str, object]) -> str:
       border-radius: 14px;
       box-shadow: 0 12px 22px rgba(2, 6, 23, 0.18);
     }}
-    .center-logo {{
-      display: flex;
-      justify-content: center;
-      margin: 18px 0 10px;
+    .org-strip-title {{
+      font-size: 1.45rem;
+      line-height: 1.1;
     }}
-    .center-logo img {{
-      max-width: min(640px, 100%);
-      width: 100%;
-      height: auto;
-      object-fit: contain;
-      border-radius: 18px;
-      border: 1px solid var(--stroke);
-      background: rgba(255,255,255,0.88);
-      box-shadow: var(--shadow);
-      padding: 10px 12px;
+    .org-strip-subtitle {{
+      margin-top: 8px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: none;
     }}
     .hero {{ display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 24px; }}
     .hero h1 {{ margin: 0; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1; letter-spacing: -0.03em; }}
@@ -274,7 +270,6 @@ def render_html(payload: dict[str, object]) -> str:
 <body>
   <div class="wrap">
     {header_html}
-    {center_logo_html}
     <section class="hero">
       <div>
         <h1>Dashboard de Frequência</h1>
