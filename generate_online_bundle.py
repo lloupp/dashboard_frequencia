@@ -180,11 +180,13 @@ def render_html(payload: dict[str, object]) -> str:
         linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
     }}
     .wrap {{ max-width: 1280px; margin: 0 auto; padding: 32px 20px 48px; }}
-    .org-header {{ margin: 0 auto 22px; }}
+    .org-header {{ margin: 0 auto 22px; display: flex; flex-direction: column; align-items: center; }}
     .org-header-image {{
-      width: 100%;
+      width: min(920px, 100%);
+      max-height: 420px;
       height: auto;
       display: block;
+      object-fit: contain;
       border-radius: 18px;
       border: 1px solid var(--stroke);
       background: rgba(255,255,255,0.9);
@@ -195,6 +197,7 @@ def render_html(payload: dict[str, object]) -> str:
       align-items: center;
       justify-content: center;
       gap: 40px;
+      width: min(920px, 100%);
       padding: 20px 18px;
       border-radius: 18px;
       border: 1px solid var(--stroke);
@@ -202,7 +205,7 @@ def render_html(payload: dict[str, object]) -> str:
       box-shadow: var(--shadow);
     }}
     .org-header-logo {{
-      height: 110px;
+      height: 96px;
       width: auto;
       max-width: 46%;
       object-fit: contain;
@@ -218,6 +221,7 @@ def render_html(payload: dict[str, object]) -> str:
       padding: 14px 16px;
       border-radius: 14px;
       box-shadow: 0 12px 22px rgba(2, 6, 23, 0.18);
+      width: min(1100px, 100%);
     }}
     .org-strip-title {{
       font-size: 1.45rem;
