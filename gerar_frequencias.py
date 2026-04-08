@@ -47,6 +47,36 @@ def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
                 df = df.rename(columns={candidate: canonical})
                 break
 
+    if "ALUNO" not in df.columns:
+        for column in df.columns:
+            if "ALUNO" in column or column.startswith("NOME"):
+                df = df.rename(columns={column: "ALUNO"})
+                break
+
+    if "DISCIPLINA" not in df.columns:
+        for column in df.columns:
+            if "DISCIPL" in column or "MATERIA" in column or "MODULO" in column:
+                df = df.rename(columns={column: "DISCIPLINA"})
+                break
+
+    if "PRESENTE" not in df.columns:
+        for column in df.columns:
+            if "PRESEN" in column:
+                df = df.rename(columns={column: "PRESENTE"})
+                break
+
+    if "AUSENTE" not in df.columns:
+        for column in df.columns:
+            if "AUSEN" in column or "FALT" in column:
+                df = df.rename(columns={column: "AUSENTE"})
+                break
+
+    if "STATUS" not in df.columns:
+        for column in df.columns:
+            if "STATUS" in column or "SITUACAO" in column:
+                df = df.rename(columns={column: "STATUS"})
+                break
+
     return df
 
 
@@ -72,7 +102,10 @@ def _get_presence_absence(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
         absent = status.isin({"ausente", "a"})
         return present, absent
 
-    raise KeyError("Colunas de frequência não encontradas (PRESENTE/AUSENTE ou STATUS).")
+    raise KeyError(
+        "Colunas de frequência não encontradas (PRESENTE/AUSENTE ou STATUS). "
+        f"Colunas disponíveis: {sorted(map(str, df.columns))}"
+    )
 
 def gerar_pdf_aluno(nome_aluno, turma, disciplinas_data, output_path, base_path):
     doc = SimpleDocTemplate(
