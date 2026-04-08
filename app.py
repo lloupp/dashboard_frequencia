@@ -74,29 +74,36 @@ with tab_dashboard:
     st.caption("Gera um PDF por aluno (compactado em .zip) usando a planilha enviada.")
 
     if st.button("Gerar PDFs de frequência", use_container_width=True):
-        with st.spinner("Gerando PDFs..."):
-            with TemporaryDirectory(prefix="frequencias_") as temp_dir:
-                temp_path = Path(temp_dir)
-                input_path = temp_path / "FREQUENCIA.xlsx"
-                output_dir = temp_path / "frequencias"
-                input_path.write_bytes(file_bytes)
-                output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with st.spinner("Gerando PDFs..."):
+                with TemporaryDirectory(prefix="frequencias_") as temp_dir:
+                    temp_path = Path(temp_dir)
+                    input_path = temp_path / "FREQUENCIA.xlsx"
+                    output_dir = temp_path / "frequencias"
+                    input_path.write_bytes(file_bytes)
+                    output_dir.mkdir(parents=True, exist_ok=True)
 
-                total = processar_frequencias(str(input_path), str(output_dir), str(Path(__file__).resolve().parent))
+                    total = processar_frequencias(
+                        str(input_path),
+                        str(output_dir),
+                        str(Path(__file__).resolve().parent),
+                    )
 
-                zip_path = temp_path / "frequencias.zip"
-                with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zip_file:
-                    for pdf_path in sorted(output_dir.glob("*.pdf")):
-                        zip_file.write(pdf_path, arcname=pdf_path.name)
+                    zip_path = temp_path / "frequencias.zip"
+                    with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zip_file:
+                        for pdf_path in sorted(output_dir.glob("*.pdf")):
+                            zip_file.write(pdf_path, arcname=pdf_path.name)
 
-                st.success(f"PDFs gerados: {total}")
-                st.download_button(
-                    "Baixar PDFs (ZIP)",
-                    data=zip_path.read_bytes(),
-                    file_name="frequencias.zip",
-                    mime="application/zip",
-                    use_container_width=True,
-                )
+                    st.success(f"PDFs gerados: {total}")
+                    st.download_button(
+                        "Baixar PDFs (ZIP)",
+                        data=zip_path.read_bytes(),
+                        file_name="frequencias.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                    )
+        except Exception as error:
+            st.error(f"Falha ao gerar PDFs: {error}")
 
 with tab_invalidos:
     invalid_records = payload.get("invalid_records") or []

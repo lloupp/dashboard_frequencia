@@ -5,6 +5,6 @@ Arquivos suportados:
 - `header.png` ou `header.jpg` (imagem única do cabeçalho inteiro), **ou**
 - `santa_casa.png`/`.jpg` e `ufcspa.png`/`.jpg` (logos separados)
 
-Opcional:
+Alternativa:
 
-- `santa_ufcspa.png`/`.jpg` (logo central que aparece abaixo do cabeçalho)
+- `santa_ufcspa.png`/`.jpg` (pode ficar na raiz do projeto ou em `assets/`; vira o cabeçalho inteiro)
