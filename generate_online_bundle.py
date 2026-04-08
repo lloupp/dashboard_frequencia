@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from io import BytesIO
 from pathlib import Path
@@ -12,27 +13,58 @@ from generate_dashboards import PRIMARY_SHEETS, find_source_file, load_data, sum
 ROOT = Path(__file__).resolve().parent
 OUTPUT_HTML = ROOT / "dashboard_online.html"
 OUTPUT_JSON = ROOT / "dashboard_data.json"
+ASSETS_DIR = ROOT / "assets"
+
+
+def _asset_data_url(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+
+    suffix = path.suffix.lower().lstrip(".")
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "svg": "image/svg+xml",
+    }.get(suffix)
+    if not mime:
+        return None
+
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
 
 
 def build_payload(data: pd.DataFrame, summary: dict[str, pd.DataFrame | dict[str, object]]) -> dict[str, object]:
     records = data[["DATA", "DATA_EXIBICAO", "CURSO", "TURNO", "DISCIPLINA", "ALUNO", "STATUS"]].copy()
     records["DATA"] = records["DATA"].dt.strftime("%Y-%m-%d")
-    records["DIA_SEMANA"] = pd.to_datetime(records["DATA"]).dt.day_name().map(
-        {
-            "Monday": "Segunda",
-            "Tuesday": "Terça",
-            "Wednesday": "Quarta",
-            "Thursday": "Quinta",
-            "Friday": "Sexta",
-            "Saturday": "Sábado",
-            "Sunday": "Domingo",
-        }
-    )
     records = records[records["STATUS"].isin(["Presente", "Ausente"])].reset_index(drop=True)
+
+    invalid = data[~data["STATUS"].isin(["Presente", "Ausente"])].copy()
+    if not invalid.empty:
+        invalid["DATA"] = invalid["DATA"].dt.strftime("%Y-%m-%d")
+        invalid["MOTIVO"] = "Status inválido"
+        missing_date = invalid["DATA"].isna() | (invalid["DATA"] == "NaT")
+        invalid.loc[missing_date, "MOTIVO"] = "Data inválida"
+
+        if "PRESENTE" in invalid.columns and "AUSENTE" in invalid.columns:
+            present = invalid["PRESENTE"].fillna(False).astype(bool)
+            absent = invalid["AUSENTE"].fillna(False).astype(bool)
+            invalid.loc[~present & ~absent, "MOTIVO"] = "Sem marcação"
+            invalid.loc[present & absent, "MOTIVO"] = "Conflito: presente e ausente"
+
+        invalid_records = (
+            invalid[["DATA", "DATA_EXIBICAO", "CURSO", "TURNO", "DISCIPLINA", "ALUNO", "STATUS", "MOTIVO"]]
+            .fillna("")
+            .to_dict(orient="records")
+        )
+    else:
+        invalid_records = []
 
     return {
         "meta": summary["meta"],
         "records": records.to_dict(orient="records"),
+        "invalid_records": invalid_records,
     }
 
 
@@ -90,6 +122,36 @@ def generate_dashboard_artifacts(file_bytes: bytes) -> tuple[dict[str, object], 
 
 def render_html(payload: dict[str, object]) -> str:
     payload_json = json.dumps(payload, ensure_ascii=False)
+
+    header_image = _asset_data_url(ASSETS_DIR / "header.png") or _asset_data_url(ASSETS_DIR / "header.jpg")
+    logo_left = _asset_data_url(ASSETS_DIR / "santa_casa.png") or _asset_data_url(ASSETS_DIR / "santa_casa.jpg")
+    logo_right = _asset_data_url(ASSETS_DIR / "ufcspa.png") or _asset_data_url(ASSETS_DIR / "ufcspa.jpg")
+    center_logo = _asset_data_url(ROOT / "santa_ufcspa.png") or _asset_data_url(ASSETS_DIR / "santa_ufcspa.png")
+
+    header_visual = ""
+    if header_image:
+        header_visual = f'<img class="org-header-image" src="{header_image}" alt="Santa Casa e UFCSPA" />'
+    elif logo_left or logo_right:
+        left_html = (
+            f'<img class="org-header-logo" src="{logo_left}" alt="Santa Casa Porto Alegre" />' if logo_left else ""
+        )
+        right_html = f'<img class="org-header-logo" src="{logo_right}" alt="UFCSPA" />' if logo_right else ""
+        header_visual = f'<div class="org-header-logos">{left_html}{right_html}</div>'
+
+    header_html = f"""
+    <header class="org-header" aria-label="Cabeçalho institucional">
+      {header_visual}
+      <div class="org-header-strip">UFCSPA / SANTA CASA DE PORTO ALEGRE</div>
+    </header>
+    """
+
+    center_logo_html = ""
+    if center_logo:
+        center_logo_html = f"""
+    <div class="center-logo" aria-label="Logo institucional">
+      <img src="{center_logo}" alt="Santa Casa e UFCSPA" />
+    </div>
+    """
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -104,6 +166,7 @@ def render_html(payload: dict[str, object]) -> str:
       --muted: #5f6b7a;
       --stroke: rgba(15, 23, 42, 0.08);
       --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --brand-navy: #0d2b57;
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -116,11 +179,66 @@ def render_html(payload: dict[str, object]) -> str:
         linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
     }}
     .wrap {{ max-width: 1280px; margin: 0 auto; padding: 32px 20px 48px; }}
+    .org-header {{ margin: 0 auto 22px; }}
+    .org-header-image {{
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 18px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.9);
+      box-shadow: var(--shadow);
+    }}
+    .org-header-logos {{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 20px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.9);
+      box-shadow: var(--shadow);
+    }}
+    .org-header-logo {{
+      height: 110px;
+      width: auto;
+      max-width: 46%;
+      object-fit: contain;
+    }}
+    .org-header-strip {{
+      margin-top: 16px;
+      background: var(--brand-navy);
+      color: #fff;
+      text-align: center;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 14px 16px;
+      border-radius: 14px;
+      box-shadow: 0 12px 22px rgba(2, 6, 23, 0.18);
+    }}
+    .center-logo {{
+      display: flex;
+      justify-content: center;
+      margin: 18px 0 10px;
+    }}
+    .center-logo img {{
+      max-width: min(640px, 100%);
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      border-radius: 18px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.88);
+      box-shadow: var(--shadow);
+      padding: 10px 12px;
+    }}
     .hero {{ display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 24px; }}
     .hero h1 {{ margin: 0; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1; letter-spacing: -0.03em; }}
     .hero p {{ margin: 10px 0 0; color: var(--muted); max-width: 760px; font-size: 1rem; }}
     .stamp {{ background: rgba(255,255,255,0.85); border: 1px solid var(--stroke); box-shadow: var(--shadow); border-radius: 18px; padding: 16px 18px; min-width: 220px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }}
     .card, .panel {{ background: var(--card); border: 1px solid var(--stroke); box-shadow: var(--shadow); border-radius: 22px; }}
     .card {{ padding: 18px; }}
     .label {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }}
@@ -155,6 +273,8 @@ def render_html(payload: dict[str, object]) -> str:
 </head>
 <body>
   <div class="wrap">
+    {header_html}
+    {center_logo_html}
     <section class="hero">
       <div>
         <h1>Dashboard de Frequência</h1>
@@ -168,6 +288,7 @@ def render_html(payload: dict[str, object]) -> str:
 
     <section class="grid">
       <article class="card"><div class="label">Registros válidos</div><div class="value" id="registros"></div></article>
+      <article class="card"><div class="label">Registros inválidos</div><div class="value" id="invalidos"></div></article>
       <article class="card"><div class="label">Frequência geral</div><div class="value" id="frequencia"></div></article>
       <article class="card"><div class="label">Alunos</div><div class="value" id="alunos"></div></article>
       <article class="card"><div class="label">Disciplinas</div><div class="value" id="disciplinas"></div></article>
@@ -183,7 +304,6 @@ def render_html(payload: dict[str, object]) -> str:
         <div><label for="start-date">Data inicial</label><input id="start-date" type="date" /></div>
         <div><label for="end-date">Data final</label><input id="end-date" type="date" /></div>
         <div><label for="frequency-filter">Faixa de frequência</label><select id="frequency-filter"><option value="0">Sem corte</option><option value="below_75">Abaixo de 75%</option><option value="0.75">75%+</option><option value="0.8">80%+</option><option value="0.9">90%+</option></select></div>
-        <div><label for="weekday-filter">Dia da semana</label><select id="weekday-filter"><option value="Todos">Todos</option><option value="Segunda">Segunda</option><option value="Terça">Terça</option><option value="Quarta">Quarta</option><option value="Quinta">Quinta</option><option value="Sexta">Sexta</option><option value="Sábado">Sábado</option><option value="Domingo">Domingo</option></select></div>
       </div>
     </section>
 
@@ -283,7 +403,6 @@ def render_html(payload: dict[str, object]) -> str:
         start: document.getElementById('start-date'),
         end: document.getElementById('end-date'),
         freq: document.getElementById('frequency-filter'),
-        weekday: document.getElementById('weekday-filter'),
       }};
 
       const uniqueCourses = ['Todos', ...Array.from(new Set(records.map((row) => row.CURSO)))];
@@ -303,8 +422,7 @@ def render_html(payload: dict[str, object]) -> str:
             && (!ids.discipline.value.trim() || row.DISCIPLINA.toLowerCase().includes(ids.discipline.value.trim().toLowerCase()))
             && (!ids.student.value.trim() || row.ALUNO.toLowerCase().includes(ids.student.value.trim().toLowerCase()))
             && (!ids.start.value || rowDate >= normalizeDate(ids.start.value))
-            && (!ids.end.value || rowDate <= normalizeDate(ids.end.value))
-            && (ids.weekday.value === 'Todos' || row.DIA_SEMANA === ids.weekday.value);
+            && (!ids.end.value || rowDate <= normalizeDate(ids.end.value));
         }});
 
         let courseSummary = aggregate(filtered, ['CURSO']).sort((a, b) => a.CURSO.localeCompare(b.CURSO, 'pt-BR'));
@@ -317,6 +435,7 @@ def render_html(payload: dict[str, object]) -> str:
 
         const freqGeral = filtered.length ? filtered.filter((row) => row.STATUS === 'Presente').length / filtered.length : 0;
         document.getElementById('registros').textContent = number(filtered.length);
+        document.getElementById('invalidos').textContent = number(data.meta.total_registros_invalidos || 0);
         document.getElementById('frequencia').textContent = percent(freqGeral);
         document.getElementById('alunos').textContent = number(new Set(filtered.map((row) => row.CURSO + '::' + row.ALUNO)).size);
         document.getElementById('disciplinas').textContent = number(new Set(filtered.map((row) => row.CURSO + '::' + row.DISCIPLINA)).size);

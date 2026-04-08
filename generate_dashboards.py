@@ -107,6 +107,8 @@ def summarize_data(data: pd.DataFrame) -> dict[str, pd.DataFrame | dict[str, obj
     valid = data[data["STATUS"].isin(["Presente", "Ausente"])].copy()
 
     total_registros = int(len(valid))
+    total_registros_brutos = int(len(data))
+    total_registros_invalidos = max(total_registros_brutos - total_registros, 0)
     total_presencas = int(valid["PRESENTE"].sum())
     total_ausencias = int(valid["AUSENTE"].sum())
     frequencia_geral = (total_presencas / total_registros) if total_registros else 0
@@ -181,15 +183,20 @@ def summarize_data(data: pd.DataFrame) -> dict[str, pd.DataFrame | dict[str, obj
     top_students = student.head(12).copy()
     top_disciplines = discipline.head(12).copy()
 
+    periodo_inicio = valid["DATA"].min() if total_registros else None
+    periodo_fim = valid["DATA"].max() if total_registros else None
+
     meta = {
         "total_registros": total_registros,
+        "total_registros_invalidos": total_registros_invalidos,
+        "total_registros_brutos": total_registros_brutos,
         "total_presencas": total_presencas,
         "total_ausencias": total_ausencias,
         "frequencia_geral": frequencia_geral,
         "total_alunos": int(valid["ALUNO"].nunique()),
         "total_disciplinas": int(valid["DISCIPLINA"].nunique()),
-        "periodo_inicio": valid["DATA"].min().strftime("%d/%m/%Y"),
-        "periodo_fim": valid["DATA"].max().strftime("%d/%m/%Y"),
+        "periodo_inicio": periodo_inicio.strftime("%d/%m/%Y") if periodo_inicio is not None and pd.notna(periodo_inicio) else "",
+        "periodo_fim": periodo_fim.strftime("%d/%m/%Y") if periodo_fim is not None and pd.notna(periodo_fim) else "",
         "gerado_em": datetime.now().strftime("%d/%m/%Y %H:%M"),
     }
 
