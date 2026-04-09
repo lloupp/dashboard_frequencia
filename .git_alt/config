@@ -13,3 +13,6 @@
 [branch "eduardo/feat/add-dashboard-logo-and-pdf"]
 	remote = origin
 	merge = refs/heads/eduardo/feat/add-dashboard-logo-and-pdf
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
