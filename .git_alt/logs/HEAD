@@ -1,9 +1,0 @@
-0000000000000000000000000000000000000000 a99cfef245a4bc14afe96978ce99761dd1eab8ce Eduardo Dantas <eduardo.dantas@local> 1775674001 -0300	commit (initial): feat: Add dashboard logo and frequency PDF export
-a99cfef245a4bc14afe96978ce99761dd1eab8ce 846e2b7ebeeb59f93b923f73fb2ebd484da469a2 Eduardo Dantas <eduardo.dantas@local> 1775674329 -0300	commit: fix: Handle alternate attendance columns in PDF export
-846e2b7ebeeb59f93b923f73fb2ebd484da469a2 a4674022810510f260ca2ef6b863bca92b5c3b45 Eduardo Dantas <eduardo.dantas@local> 1775674460 -0300	commit: style: Match institutional header layout in generated HTML
-a4674022810510f260ca2ef6b863bca92b5c3b45 7c0856b2fbd3dc9d342ace0b7f3c3347abfc9576 Eduardo Dantas <eduardo.dantas@local> 1775674548 -0300	commit: fix: Infer attendance columns when generating PDFs
-7c0856b2fbd3dc9d342ace0b7f3c3347abfc9576 5ff877e15a9d77e4876f0a4db6362ae6d394f4a3 Eduardo Dantas <eduardo.dantas@local> 1775674643 -0300	commit: style: Reduce header logo size in generated dashboard
-5ff877e15a9d77e4876f0a4db6362ae6d394f4a3 042927bfbb43b46bb93b2ec1731f62b2d9036fe1 Eduardo Dantas <eduardo.dantas@local> 1775676697 -0300	commit: docs: Add README for Streamlit Cloud deployment
-042927bfbb43b46bb93b2ec1731f62b2d9036fe1 f6d6353096720060fb41b0eaf159b3a3ed3da1cf Eduardo Dantas <eduardo.dantas@local> 1775678663 -0300	checkout: moving from eduardo/feat/add-dashboard-logo-and-pdf to main
-f6d6353096720060fb41b0eaf159b3a3ed3da1cf 1577c9d0fdb9c7fd92c6558b4dccced7a99b82d3 Eduardo Dantas <eduardo.dantas@local> 1775678677 -0300	merge eduardo/feat/add-dashboard-logo-and-pdf: Merge made by the 'ort' strategy.
-1577c9d0fdb9c7fd92c6558b4dccced7a99b82d3 8cb11872b8cdb8e5c7622bf45b535ea893c7eb66 Eduardo Dantas <eduardo.dantas@local> 1775678703 -0300	commit: chore: Remove accidentally committed .git_alt directory
