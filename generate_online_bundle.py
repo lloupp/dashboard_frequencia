@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import json
@@ -14,6 +14,372 @@ ROOT = Path(__file__).resolve().parent
 OUTPUT_HTML = ROOT / "dashboard_online.html"
 OUTPUT_JSON = ROOT / "dashboard_data.json"
 ASSETS_DIR = ROOT / "assets"
+
+DISCIPLINE_CONTROL_SCRIPT = r"""
+const dashboardDisciplinasConfig = {
+  "GINECOLOGIA ENDOCRINOLÓGICA": {
+    "Hiperandrogenismo": { carga_horaria: 28, total_aulas: 7 },
+    "Distúrbios Metabólicos e de Tireoide": { carga_horaria: 24, total_aulas: 6 },
+    "Alterações Uterinas": { carga_horaria: 28, total_aulas: 7 },
+    "Fertilidade, Anticoncepção e Planejamento Familiar": { carga_horaria: 28, total_aulas: 7 },
+    "Climatério": { carga_horaria: 28, total_aulas: 7 },
+    "Neuroendocrinologia": { carga_horaria: 24, total_aulas: 6 },
+    "Pesquisa aplicada à Prática Clínica": { carga_horaria: 24, total_aulas: 8 },
+    "Endocrinologia Reprodutiva": { carga_horaria: 28, total_aulas: 7 }
+  },
+  "DIABETES E OBESIDADE": {
+    "Disclosure": { carga_horaria: 16, total_aulas: 4 },
+    "Nutrição na Saúde, Diabetes e Obesidade": { carga_horaria: 20, total_aulas: 5 },
+    "Complicações Sistêmicas do Diabetes": { carga_horaria: 32, total_aulas: 8 },
+    "Obesidade: Visão Geral": { carga_horaria: 32, total_aulas: 8 },
+    "Complicações Sistêmicas da Obesidade": { carga_horaria: 32, total_aulas: 8 },
+    "Cirurgia Bariátrica e Metabólica": { carga_horaria: 16, total_aulas: 4 },
+    "Saúde Mental em Diabetes e Obesidade": { carga_horaria: 16, total_aulas: 4 },
+    "Diabetes: Visão Geral": { carga_horaria: 28, total_aulas: 7 },
+    "Diabetes: Manejo Prático": { carga_horaria: 32, total_aulas: 8 }
+  },
+  "GERIATRIA": {
+    "O cuidado do idoso no Ambulatório I": { carga_horaria: 24, total_aulas: 6 },
+    "O cuidado do idoso no Ambulatório II": { carga_horaria: 24, total_aulas: 6 },
+    "O cuidado do comanejo clínico-cirúrgico do idoso": { carga_horaria: 24, total_aulas: 6 },
+    "O cuidado em oncogeriatria": { carga_horaria: 24, total_aulas: 6 },
+    "O cuidado do idoso em ILPs": { carga_horaria: 24, total_aulas: 6 },
+    "Disclosure": { carga_horaria: 16, total_aulas: 4 },
+    "O cuidado do idoso na internação hospitalar": { carga_horaria: 24, total_aulas: 6 },
+    "O cuidado do idoso na Emergência": { carga_horaria: 24, total_aulas: 7 }
+  }
+};
+
+const dashboardDisciplinasPorEnsalamento = {
+  "DIABETES E OBESIDADE": {
+    ensalamento_1: {
+      "Disclosure": 4,
+      "Nutrição na Saúde, Diabetes e Obesidade": 5,
+      "Complicações Sistêmicas do Diabetes": 8,
+      "Obesidade: Visão Geral": 8,
+      "Complicações Sistêmicas da Obesidade": 8,
+      "Cirurgia Bariátrica e Metabólica": 4,
+      "Saúde Mental em Diabetes e Obesidade": 4,
+      "Diabetes: Visão Geral": 7,
+      "Diabetes: Manejo Prático": 8
+    },
+    ensalamento_2: {
+      "Disclosure": 4,
+      "Nutrição na Saúde, Diabetes e Obesidade": 5,
+      "Complicações Sistêmicas do Diabetes": 8,
+      "Obesidade: Visão Geral": 8,
+      "Complicações Sistêmicas da Obesidade": 8,
+      "Cirurgia Bariátrica e Metabólica": 4,
+      "Saúde Mental em Diabetes e Obesidade": 4,
+      "Diabetes: Visão Geral": 7,
+      "Diabetes: Manejo Prático": 8
+    }
+  },
+  "GERIATRIA": {
+    ensalamento_1: {
+      "O cuidado do idoso no Ambulatório I": 6,
+      "O cuidado do idoso no Ambulatório II": 6,
+      "O cuidado do comanejo clínico-cirúrgico do idoso": 6,
+      "O cuidado em oncogeriatria": 6,
+      "O cuidado do idoso em ILPs": 6,
+      "Disclosure": 4,
+      "O cuidado do idoso na internação hospitalar": 6,
+      "O cuidado do idoso na Emergência": 7
+    }
+  }
+};
+
+function obterCursoConfig(curso) {
+  return dashboardDisciplinasConfig[curso] || null;
+}
+
+function normalizarChaveDisciplina(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s*\((\d+\s*h(?:oras?)?)\)\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function obterDisciplinaConfig(curso, nomeDisciplina) {
+  const cursoConfig = obterCursoConfig(curso);
+  const chaveNormalizada = normalizarChaveDisciplina(nomeDisciplina);
+
+  if (cursoConfig) {
+    const entradaCurso = Object.entries(cursoConfig).find(
+      ([disciplina]) => normalizarChaveDisciplina(disciplina) === chaveNormalizada
+    );
+    if (entradaCurso) return entradaCurso[1];
+  }
+
+  const encontrados = Object.values(dashboardDisciplinasConfig)
+    .map((configCurso) =>
+      Object.entries(configCurso).find(
+        ([disciplina]) => normalizarChaveDisciplina(disciplina) === chaveNormalizada
+      )
+    )
+    .filter(Boolean)
+    .map((entrada) => entrada[1]);
+
+  return encontrados[0] || null;
+}
+
+function obterNomeDisciplinaCanonico(curso, nomeDisciplina) {
+  const cursoConfig = obterCursoConfig(curso);
+  const chaveNormalizada = normalizarChaveDisciplina(nomeDisciplina);
+
+  if (cursoConfig) {
+    const entradaCurso = Object.keys(cursoConfig).find(
+      (disciplina) => normalizarChaveDisciplina(disciplina) === chaveNormalizada
+    );
+    if (entradaCurso) return entradaCurso;
+  }
+
+  const encontrada = Object.values(dashboardDisciplinasConfig)
+    .flatMap((configCurso) => Object.keys(configCurso))
+    .find((disciplina) => normalizarChaveDisciplina(disciplina) === chaveNormalizada);
+
+  return encontrada || nomeDisciplina;
+}
+
+function obterEnsalamentosCurso(curso) {
+  return dashboardDisciplinasPorEnsalamento[curso] || null;
+}
+
+function normalizarNumero(valor) {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function calcularStatusAula(aulaAtual, totalAulas) {
+  if (aulaAtual > totalAulas) return 'erro';
+  if (aulaAtual === totalAulas) return 'concluida';
+  return 'em_andamento';
+}
+
+function processarAula(aula) {
+  const curso = aula?.curso ?? aula?.CURSO ?? '';
+  const disciplinaOriginal = aula?.disciplina ?? aula?.DISCIPLINA ?? '';
+  const numeroAula = normalizarNumero(aula?.aula ?? aula?.AULA ?? 0);
+  const config = obterDisciplinaConfig(curso, disciplinaOriginal);
+  const disciplina = obterNomeDisciplinaCanonico(curso, disciplinaOriginal);
+
+  if (!config) {
+    console.error(`[disciplinas] Configuração não encontrada para curso="${curso}" disciplina="${disciplina}".`, aula);
+    return {
+      ...aula,
+      curso,
+      disciplina,
+      aula: numeroAula,
+      erro: true,
+      status: 'erro',
+      mensagem_erro: 'disciplina_sem_configuracao',
+    };
+  }
+
+  const totalAulas = normalizarNumero(config.total_aulas);
+  const cargaHoraria = normalizarNumero(config.carga_horaria);
+  const percentual = totalAulas > 0 ? numeroAula / totalAulas : 0;
+  const status = calcularStatusAula(numeroAula, totalAulas);
+  const erro = status === 'erro';
+
+  if (erro) {
+    console.error(
+      `[disciplinas] Aula inválida para curso="${curso}" disciplina="${disciplina}": aula=${numeroAula}, total_aulas=${totalAulas}.`,
+      aula
+    );
+  }
+
+  return {
+    ...aula,
+    curso,
+    disciplina,
+    aula: numeroAula,
+    carga_horaria: cargaHoraria,
+    total_aulas: totalAulas,
+    progresso: `${numeroAula}/${totalAulas}`,
+    percentual,
+    status,
+    erro,
+  };
+}
+
+function processarLista(aulas) {
+  if (!Array.isArray(aulas)) return [];
+  return aulas.map(processarAula);
+}
+
+function agruparPorDisciplina(aulas) {
+  return aulas.reduce((grupos, aula) => {
+    const curso = aula.curso ?? aula.CURSO ?? 'Sem curso';
+    const disciplina = aula.disciplina ?? aula.DISCIPLINA ?? 'Não informada';
+    const chave = `${curso}||${disciplina}`;
+    if (!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push(aula);
+    return grupos;
+  }, {});
+}
+
+function calcularProgressoGeralCurso(aulas) {
+  const todas = processarLista(aulas);
+  const processadas = todas.filter((item) => !item.erro && item.total_aulas > 0);
+  const totalDisciplinas = processadas.length;
+
+  return {
+    total_disciplinas: totalDisciplinas,
+    concluidas: processadas.filter((item) => item.status === 'concluida').length,
+    em_andamento: processadas.filter((item) => item.status === 'em_andamento').length,
+    com_erro: todas.filter((item) => item.erro).length,
+    percentual_medio: totalDisciplinas
+      ? processadas.reduce((total, item) => total + item.percentual, 0) / totalDisciplinas
+      : 0,
+  };
+}
+
+function contarAulasPorDisciplina(aulas) {
+  return aulas.reduce((contagem, aula) => {
+    const disciplina = aula.disciplina ?? aula.DISCIPLINA;
+    if (!disciplina) return contagem;
+
+    const aulaAtual = normalizarNumero(aula.aula ?? aula.AULA);
+    const atual = contagem[disciplina] || { registros: 0, maior_aula: 0 };
+    atual.registros += 1;
+    atual.maior_aula = Math.max(atual.maior_aula, aulaAtual);
+    contagem[disciplina] = atual;
+    return contagem;
+  }, {});
+}
+
+function validarEnsalamento(aulas, ensalamento, curso) {
+  const cursoAtual = curso
+    || aulas.find((item) => item.curso || item.CURSO)?.curso
+    || aulas.find((item) => item.curso || item.CURSO)?.CURSO
+    || '';
+  const ensalamentosCurso = obterEnsalamentosCurso(cursoAtual);
+
+  if (!ensalamentosCurso || !ensalamentosCurso[ensalamento]) {
+    return {
+      curso: cursoAtual,
+      ensalamento,
+      erro: false,
+      mensagem_erro: 'ensalamento_nao_configurado',
+      faltantes: [],
+      excedentes: [],
+      corretas: [],
+      contagem_atual: {},
+    };
+  }
+
+  const esperado = ensalamentosCurso[ensalamento];
+  const contagemBase = contarAulasPorDisciplina(aulas);
+  const contagemAtual = Object.entries(contagemBase).reduce((resultado, [disciplina, valores]) => {
+    resultado[normalizarChaveDisciplina(disciplina)] =
+      valores.registros > 1 ? valores.registros : (valores.maior_aula || valores.registros);
+    return resultado;
+  }, {});
+  const esperadoNormalizado = Object.entries(esperado).reduce((resultado, [disciplina, total]) => {
+    resultado[normalizarChaveDisciplina(disciplina)] = total;
+    return resultado;
+  }, {});
+
+  const faltantes = [];
+  const excedentes = [];
+  const corretas = [];
+
+  new Set([...Object.keys(esperadoNormalizado), ...Object.keys(contagemAtual)]).forEach((disciplina) => {
+    const atual = normalizarNumero(contagemAtual[disciplina]);
+    const totalEsperado = normalizarNumero(esperadoNormalizado[disciplina]);
+
+    if (!(disciplina in esperadoNormalizado)) {
+      excedentes.push({ disciplina, atual, esperado: 0, diferenca: atual });
+      console.error(`[ensalamento] Disciplina não prevista: curso="${cursoAtual}" disciplina="${disciplina}" atual=${atual}`);
+      return;
+    }
+
+    if (atual < totalEsperado) {
+      faltantes.push({ disciplina, atual, esperado: totalEsperado, diferenca: totalEsperado - atual });
+      return;
+    }
+
+    if (atual > totalEsperado) {
+      excedentes.push({ disciplina, atual, esperado: totalEsperado, diferenca: atual - totalEsperado });
+      console.error(`[ensalamento] Excesso de aulas: curso="${cursoAtual}" disciplina="${disciplina}" atual=${atual} esperado=${totalEsperado}`);
+      return;
+    }
+
+    corretas.push({ disciplina, atual, esperado: totalEsperado });
+  });
+
+  return {
+    curso: cursoAtual,
+    ensalamento,
+    erro: faltantes.length > 0 || excedentes.length > 0,
+    faltantes,
+    excedentes,
+    corretas,
+    contagem_atual: contagemAtual,
+  };
+}
+
+function gerarResumoPorEnsalamento(aulas, ensalamento, curso) {
+  return {
+    curso,
+    ensalamento,
+    progresso_geral: calcularProgressoGeralCurso(aulas),
+    validacao: validarEnsalamento(aulas, ensalamento, curso),
+  };
+}
+
+function construirControleDisciplinas(records) {
+  const aulasPorDisciplina = new Map();
+
+  records.forEach((row) => {
+    const chave = `${row.CURSO}||${row.DISCIPLINA}`;
+    if (!aulasPorDisciplina.has(chave)) {
+      aulasPorDisciplina.set(chave, {
+        curso: row.CURSO,
+        disciplina: row.DISCIPLINA,
+        datas: new Set(),
+      });
+    }
+
+    if (row.DATA) {
+      aulasPorDisciplina.get(chave).datas.add(row.DATA);
+    }
+  });
+
+  return Array.from(aulasPorDisciplina.values())
+    .map((item) => processarAula({
+      curso: item.curso,
+      disciplina: item.disciplina,
+      aula: item.datas.size,
+    }))
+    .sort((a, b) =>
+      a.curso.localeCompare(b.curso, 'pt-BR')
+      || a.disciplina.localeCompare(b.disciplina, 'pt-BR')
+    );
+}
+
+function formatarStatusDisciplina(status) {
+  if (status === 'concluida') return 'Concluída';
+  if (status === 'em_andamento') return 'Em andamento';
+  if (status === 'erro') return 'Erro';
+  return '-';
+}
+
+window.disciplinas_config = dashboardDisciplinasConfig;
+window.disciplinas_por_ensalamento = dashboardDisciplinasPorEnsalamento;
+window.processarAula = processarAula;
+window.processarLista = processarLista;
+window.agruparPorDisciplina = agruparPorDisciplina;
+window.calcularProgressoGeralCurso = calcularProgressoGeralCurso;
+window.calcularProgressoGeralTurma = calcularProgressoGeralCurso;
+window.validarEnsalamento = validarEnsalamento;
+window.gerarResumoPorEnsalamento = gerarResumoPorEnsalamento;
+window.construirControleDisciplinas = construirControleDisciplinas;
+"""
 
 
 def _asset_data_url(path: Path) -> str | None:
@@ -149,7 +515,7 @@ def render_html(payload: dict[str, object]) -> str:
       {header_visual}
       <div class="org-header-strip">
         <div class="org-strip-title">UFCSPA / SANTA CASA DE PORTO ALEGRE</div>
-        <div class="org-strip-subtitle">Pós-Médica — Programa de Especialização Médica</div>
+        <div class="org-strip-subtitle">Pós-Médica - Programa de Especialização Médica</div>
       </div>
     </header>
     """
@@ -244,20 +610,30 @@ def render_html(payload: dict[str, object]) -> str:
     .label {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }}
     .value {{ font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; }}
     .panel {{ padding: 20px; }}
+    .panel-draggable {{ cursor: grab; user-select: none; }}
+    .panel-dragging {{ opacity: 0.55; }}
+    .layout-edit-hint {{ color: var(--muted); font-size: 0.82rem; margin-top: -6px; margin-bottom: 12px; }}
     .filters {{ display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }}
     .filters label {{ display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }}
     .filters input, .filters select {{ width: 100%; border: 1px solid rgba(15, 23, 42, 0.1); background: rgba(255,255,255,0.9); border-radius: 14px; padding: 12px 14px; color: var(--text); font-size: 0.96rem; outline: none; }}
-    .panels {{ display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }}
+    .panels {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr); gap: 16px; margin-bottom: 16px; }}
     .panel h2 {{ margin: 0 0 18px; font-size: 1.1rem; }}
     .bars {{ display: grid; gap: 12px; }}
     .bar-row {{ display: grid; grid-template-columns: 220px 1fr 68px; gap: 12px; align-items: center; }}
     .bar-track {{ height: 14px; background: #e7edf6; border-radius: 999px; overflow: hidden; }}
     .bar-fill {{ height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%); }}
-    .mini-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; }}
-    th, td {{ padding: 10px 0; border-bottom: 1px solid rgba(15, 23, 42, 0.08); text-align: left; }}
+    .mini-grid {{ display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 16px; }}
+    .triple-grid {{ display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }}
+    .stacked-panels {{ display: grid; gap: 16px; margin-top: 16px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; table-layout: auto; }}
+    th, td {{ padding: 10px 8px 10px 0; border-bottom: 1px solid rgba(15, 23, 42, 0.08); text-align: left; vertical-align: top; }}
     th {{ color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }}
     .timeline {{ height: 290px; display: flex; align-items: end; gap: 8px; padding-top: 18px; overflow-x: auto; }}
+    .legend {{ display: flex; gap: 18px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }}
+    .legend-item {{ display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; }}
+    .legend-swatch {{ width: 14px; height: 14px; border-radius: 999px; display: inline-block; }}
+    .legend-swatch.present {{ background: linear-gradient(180deg, #22c55e 0%, #15803d 100%); }}
+    .legend-swatch.absent {{ background: linear-gradient(180deg, #fb7185 0%, #b91c1c 100%); }}
     .timeline-col {{ flex: 1; display: flex; flex-direction: column; justify-content: end; align-items: center; gap: 8px; min-width: 42px; }}
     .stack {{ width: 100%; max-width: 42px; display: flex; flex-direction: column; justify-content: end; border-radius: 14px 14px 8px 8px; overflow: hidden; background: #edf2f8; min-height: 14px; }}
     .present {{ background: linear-gradient(180deg, #22c55e 0%, #15803d 100%); }}
@@ -265,7 +641,7 @@ def render_html(payload: dict[str, object]) -> str:
     .date-label {{ writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; }}
     .foot {{ margin-top: 18px; color: var(--muted); font-size: 0.86rem; text-align: center; }}
     @media (max-width: 980px) {{
-      .grid, .panels, .mini-grid, .filters {{ grid-template-columns: 1fr; }}
+      .grid, .panels, .mini-grid, .triple-grid, .stacked-panels, .filters {{ grid-template-columns: 1fr; }}
       .hero {{ flex-direction: column; align-items: start; }}
       .bar-row {{ grid-template-columns: 1fr; }}
     }}
@@ -298,20 +674,20 @@ def render_html(payload: dict[str, object]) -> str:
       <div class="filters">
         <div><label for="course-filter">Curso</label><select id="course-filter"></select></div>
         <div><label for="shift-filter">Turno</label><select id="shift-filter"></select></div>
-        <div><label for="discipline-filter">Disciplina</label><input id="discipline-filter" type="text" placeholder="Digite parte do nome" /></div>
-        <div><label for="student-filter">Aluno</label><input id="student-filter" type="text" placeholder="Buscar aluno" /></div>
+        <div><label for="discipline-filter">Disciplina</label><select id="discipline-filter"></select></div>
+        <div><label for="student-filter">Aluno</label><select id="student-filter"></select></div>
         <div><label for="start-date">Data inicial</label><input id="start-date" type="date" /></div>
         <div><label for="end-date">Data final</label><input id="end-date" type="date" /></div>
         <div><label for="frequency-filter">Faixa de frequência</label><select id="frequency-filter"><option value="0">Sem corte</option><option value="below_75">Abaixo de 75%</option><option value="0.75">75%+</option><option value="0.8">80%+</option><option value="0.9">90%+</option></select></div>
       </div>
     </section>
 
-    <section class="panels">
-      <article class="panel">
+    <section class="panels" id="top-panels" data-layout-group="top-panels">
+      <article class="panel panel-draggable" draggable="true" data-panel-key="frequencia-curso">
         <h2>Frequência por curso</h2>
         <div class="bars" id="course-bars"></div>
       </article>
-      <article class="panel">
+      <article class="panel panel-draggable" draggable="true" data-panel-key="resumo-executivo">
         <h2>Resumo executivo</h2>
         <table>
           <tbody>
@@ -324,20 +700,63 @@ def render_html(payload: dict[str, object]) -> str:
       </article>
     </section>
 
-    <section class="mini-grid">
-      <article class="panel">
+    <section class="mini-grid" id="summary-grid" data-layout-group="summary-grid">
+      <article class="panel panel-draggable" draggable="true" data-panel-key="top-ausencias">
         <h2>Top alunos com mais ausências</h2>
         <table><thead><tr><th>Aluno</th><th>Curso</th><th>Ausências</th><th>Freq.</th></tr></thead><tbody id="students-table"></tbody></table>
       </article>
-      <article class="panel">
-        <h2>Disciplinas com mais ausências</h2>
-        <table><thead><tr><th>Disciplina</th><th>Curso</th><th>Ausências</th><th>Freq.</th></tr></thead><tbody id="disciplines-table"></tbody></table>
+      <article class="panel panel-draggable" draggable="true" data-panel-key="top-presencas">
+        <h2>Alunos com mais presenças</h2>
+        <table><thead><tr><th>Aluno</th><th>Curso</th><th>Presenças</th><th>Freq.</th></tr></thead><tbody id="students-presence-table"></tbody></table>
       </article>
     </section>
 
-    <section class="panel" style="margin-top:16px;">
-      <h2>Evolução diária de presença e ausência</h2>
-      <div class="timeline" id="timeline"></div>
+    <section class="triple-grid" id="operational-grid" data-layout-group="operational-grid">
+      <article class="panel panel-draggable" draggable="true" data-panel-key="faltas-recentes">
+        <h2>Faltas recentes</h2>
+        <table><thead><tr><th>Data</th><th>Aluno</th><th>Disciplina</th></tr></thead><tbody id="recent-absences-table"></tbody></table>
+      </article>
+      <article class="panel panel-draggable" draggable="true" data-panel-key="disciplinas-ausencias">
+        <h2>Disciplinas com mais ausências</h2>
+        <table><thead><tr><th>Disciplina</th><th>Curso</th><th>Ausências</th><th>Freq.</th></tr></thead><tbody id="disciplines-table"></tbody></table>
+      </article>
+      <article class="panel panel-draggable" draggable="true" data-panel-key="risco-reprovacao">
+        <h2>Alunos com risco de reprovação</h2>
+        <table><thead><tr><th>Aluno</th><th>Curso</th><th>Freq.</th></tr></thead><tbody id="risk-students-table"></tbody></table>
+      </article>
+      <article class="panel panel-draggable" draggable="true" data-panel-key="sem-marcacao">
+        <h2>Alunos sem marcação</h2>
+        <table><thead><tr><th>Data</th><th>Aluno</th><th>Disciplina</th></tr></thead><tbody id="invalid-students-table"></tbody></table>
+      </article>
+    </section>
+
+    <section class="stacked-panels" id="detail-grid" data-layout-group="detail-grid">
+      <article class="panel panel-draggable" draggable="true" data-panel-key="timeline-panel">
+        <h2>Evolução diária de presença e ausência</h2>
+        <div class="legend" aria-label="Legenda do gráfico">
+          <span class="legend-item"><span class="legend-swatch present"></span>Presenças</span>
+          <span class="legend-item"><span class="legend-swatch absent"></span>Ausências</span>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </article>
+
+      <article class="panel panel-draggable" draggable="true" data-panel-key="discipline-control-panel">
+        <h2>Controle de disciplinas</h2>
+        <div class="label" id="discipline-validation-summary"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Disciplina</th>
+              <th>Curso</th>
+              <th>Carga horária</th>
+              <th>Progresso</th>
+              <th>Percentual</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="discipline-progress-table"></tbody>
+        </table>
+      </article>
     </section>
 
     <div class="foot">Quando publicado em HTTP/HTTPS, este HTML tenta ler automaticamente o arquivo <code>dashboard_data.json</code>.</div>
@@ -347,6 +766,7 @@ def render_html(payload: dict[str, object]) -> str:
     const embeddedData = {payload_json};
     const number = (value) => new Intl.NumberFormat('pt-BR').format(value || 0);
     const percent = (value) => ((value || 0) * 100).toFixed(1).replace('.', ',') + '%';
+    {DISCIPLINE_CONTROL_SCRIPT}
 
     async function loadData() {{
       if (window.location.protocol.startsWith('http')) {{
@@ -392,8 +812,105 @@ def render_html(payload: dict[str, object]) -> str:
       return value >= Number(mode || '0');
     }}
 
+    function fillSelectOptions(elementId, values, selectedValue) {{
+      const element = document.getElementById(elementId);
+      element.innerHTML = values
+        .map((value) => {{
+          const safeValue = String(value).replace(/"/g, '&quot;');
+          const selected = value === selectedValue ? ' selected' : '';
+          return `<option value="${{safeValue}}"${{selected}}>${{value}}</option>`;
+        }})
+        .join('');
+    }}
+
+    const DASHBOARD_LAYOUT_KEY = 'dashboard-layout:v3';
+    let draggingPanel = null;
+
+    function readDashboardLayout() {{
+      try {{
+        return JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_KEY) || '{{}}');
+      }} catch (error) {{
+        return {{}};
+      }}
+    }}
+
+    function writeDashboardLayout(groups) {{
+      const layout = {{}};
+      groups.forEach((group) => {{
+        layout[group.id] = Array.from(group.querySelectorAll(':scope > [data-panel-key]'))
+          .map((item) => item.dataset.panelKey);
+      }});
+      localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(layout));
+    }}
+
+    function applySavedLayout(groups) {{
+      const savedLayout = readDashboardLayout();
+      const panels = Array.from(document.querySelectorAll('[data-panel-key]'));
+      const byKey = new Map(panels.map((panel) => [panel.dataset.panelKey, panel]));
+
+      groups.forEach((group) => {{
+        const order = savedLayout[group.id] || [];
+        order.forEach((key) => {{
+          const panel = byKey.get(key);
+          if (panel) group.appendChild(panel);
+        }});
+      }});
+    }}
+
+    function getAfterElement(container, clientY) {{
+      const elements = [...container.querySelectorAll(':scope > [data-panel-key]:not(.panel-dragging)')];
+      return elements.reduce((closest, child) => {{
+        const box = child.getBoundingClientRect();
+        const offset = clientY - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {{
+          return {{ offset, element: child }};
+        }}
+        return closest;
+      }}, {{ offset: Number.NEGATIVE_INFINITY, element: null }}).element;
+    }}
+
+    function wireSortablePanels(groups) {{
+      document.querySelectorAll('[data-panel-key]').forEach((panel) => {{
+        panel.addEventListener('dragstart', () => {{
+          draggingPanel = panel;
+          panel.classList.add('panel-dragging');
+        }});
+
+        panel.addEventListener('dragend', () => {{
+          panel.classList.remove('panel-dragging');
+          draggingPanel = null;
+          writeDashboardLayout(groups);
+        }});
+      }});
+
+      groups.forEach((group) => {{
+        group.addEventListener('dragover', (event) => {{
+          event.preventDefault();
+          if (!draggingPanel) return;
+
+          const afterElement = getAfterElement(group, event.clientY);
+          if (!afterElement) {{
+            group.appendChild(draggingPanel);
+            return;
+          }}
+
+          if (afterElement !== draggingPanel) {{
+            group.insertBefore(draggingPanel, afterElement);
+          }}
+        }});
+      }});
+    }}
+
+    function initializeDashboardLayout() {{
+      const groups = Array.from(document.querySelectorAll('[data-layout-group]'));
+      applySavedLayout(groups);
+      wireSortablePanels(groups);
+    }}
+
     loadData().then((data) => {{
+      initializeDashboardLayout();
       const records = data.records;
+      const invalidRecords = data.invalid_records || [];
       const ids = {{
         course: document.getElementById('course-filter'),
         shift: document.getElementById('shift-filter'),
@@ -413,13 +930,49 @@ def render_html(payload: dict[str, object]) -> str:
       ids.start.value = orderedDates[0] || '';
       ids.end.value = orderedDates[orderedDates.length - 1] || '';
 
+      function syncQuickFilterLists() {{
+        const currentDiscipline = ids.discipline.value || 'Todos';
+        const currentStudent = ids.student.value || 'Todos';
+        const scopedByCourse = records.filter((row) =>
+          (ids.course.value === 'Todos' || row.CURSO === ids.course.value)
+          && (ids.shift.value === 'Todos' || row.TURNO === ids.shift.value)
+        );
+
+        const disciplineOptions = ['Todos', ...Array.from(new Set(scopedByCourse.map((row) => row.DISCIPLINA)))
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+
+        const selectedDiscipline = disciplineOptions.includes(currentDiscipline) ? currentDiscipline : 'Todos';
+
+        const studentOptions = ['Todos', ...Array.from(new Set(
+          scopedByCourse
+            .filter((row) => selectedDiscipline === 'Todos' || row.DISCIPLINA === selectedDiscipline)
+            .map((row) => row.ALUNO)
+        )).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+
+        const selectedStudent = studentOptions.includes(currentStudent) ? currentStudent : 'Todos';
+
+        fillSelectOptions('discipline-filter', disciplineOptions, selectedDiscipline);
+        fillSelectOptions('student-filter', studentOptions, selectedStudent);
+      }}
+
       function render() {{
+        syncQuickFilterLists();
         const filtered = records.filter((row) => {{
           const rowDate = normalizeDate(row.DATA);
           return (ids.course.value === 'Todos' || row.CURSO === ids.course.value)
             && (ids.shift.value === 'Todos' || row.TURNO === ids.shift.value)
-            && (!ids.discipline.value.trim() || row.DISCIPLINA.toLowerCase().includes(ids.discipline.value.trim().toLowerCase()))
-            && (!ids.student.value.trim() || row.ALUNO.toLowerCase().includes(ids.student.value.trim().toLowerCase()))
+            && (ids.discipline.value === 'Todos' || row.DISCIPLINA === ids.discipline.value)
+            && (ids.student.value === 'Todos' || row.ALUNO === ids.student.value)
+            && (!ids.start.value || rowDate >= normalizeDate(ids.start.value))
+            && (!ids.end.value || rowDate <= normalizeDate(ids.end.value));
+        }});
+
+        const filteredInvalid = invalidRecords.filter((row) => {{
+          const rowDate = normalizeDate(row.DATA);
+          return (ids.course.value === 'Todos' || row.CURSO === ids.course.value)
+            && (ids.shift.value === 'Todos' || row.TURNO === ids.shift.value)
+            && (ids.discipline.value === 'Todos' || row.DISCIPLINA === ids.discipline.value)
+            && (ids.student.value === 'Todos' || row.ALUNO === ids.student.value)
             && (!ids.start.value || rowDate >= normalizeDate(ids.start.value))
             && (!ids.end.value || rowDate <= normalizeDate(ids.end.value));
         }});
@@ -431,6 +984,14 @@ def render_html(payload: dict[str, object]) -> str:
         courseSummary = courseSummary.filter((row) => matchesFrequency(row.Frequencia, ids.freq.value));
         studentSummary = studentSummary.filter((row) => matchesFrequency(row.Frequencia, ids.freq.value));
         disciplineSummary = disciplineSummary.filter((row) => matchesFrequency(row.Frequencia, ids.freq.value));
+        const disciplineControl = construirControleDisciplinas(filtered);
+        const disciplineGroups = Object.values(agruparPorDisciplina(disciplineControl));
+        const groupedByCourse = disciplineGroups.reduce((acc, grupo) => {{
+          const curso = grupo[0]?.curso || 'Sem curso';
+          if (!acc[curso]) acc[curso] = [];
+          acc[curso].push(...grupo);
+          return acc;
+        }}, {{}});
 
         const freqGeral = filtered.length ? filtered.filter((row) => row.STATUS === 'Presente').length / filtered.length : 0;
         document.getElementById('registros').textContent = number(filtered.length);
@@ -465,6 +1026,18 @@ def render_html(payload: dict[str, object]) -> str:
           studentsTable.appendChild(tr);
         }});
 
+        const studentsPresenceTable = document.getElementById('students-presence-table');
+        studentsPresenceTable.innerHTML = '';
+        studentSummary
+          .slice()
+          .sort((a, b) => b.Presencas - a.Presencas || a.ALUNO.localeCompare(b.ALUNO, 'pt-BR'))
+          .slice(0, 12)
+          .forEach((row) => {{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${{row.ALUNO}}</td><td>${{row.CURSO}}</td><td>${{row.Presencas}}</td><td>${{percent(row.Frequencia)}}</td>`;
+            studentsPresenceTable.appendChild(tr);
+          }});
+
         const disciplinesTable = document.getElementById('disciplines-table');
         disciplinesTable.innerHTML = '';
         disciplineSummary.slice(0, 12).forEach((row) => {{
@@ -472,6 +1045,72 @@ def render_html(payload: dict[str, object]) -> str:
           tr.innerHTML = `<td>${{row.DISCIPLINA}}</td><td>${{row.CURSO}}</td><td>${{row.Ausencias}}</td><td>${{percent(row.Frequencia)}}</td>`;
           disciplinesTable.appendChild(tr);
         }});
+
+        const recentAbsencesTable = document.getElementById('recent-absences-table');
+        recentAbsencesTable.innerHTML = '';
+        filtered
+          .filter((row) => row.STATUS === 'Ausente')
+          .sort((a, b) => (b.DATA || '').localeCompare(a.DATA || '', 'pt-BR') || a.ALUNO.localeCompare(b.ALUNO, 'pt-BR'))
+          .slice(0, 12)
+          .forEach((row) => {{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${{row.DATA_EXIBICAO}}</td><td>${{row.ALUNO}}</td><td>${{row.DISCIPLINA}}</td>`;
+            recentAbsencesTable.appendChild(tr);
+          }});
+
+        const riskStudentsTable = document.getElementById('risk-students-table');
+        riskStudentsTable.innerHTML = '';
+        studentSummary
+          .filter((row) => row.Frequencia < 0.75)
+          .sort((a, b) => a.Frequencia - b.Frequencia || b.Ausencias - a.Ausencias || a.ALUNO.localeCompare(b.ALUNO, 'pt-BR'))
+          .slice(0, 12)
+          .forEach((row) => {{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${{row.ALUNO}}</td><td>${{row.CURSO}}</td><td>${{percent(row.Frequencia)}}</td>`;
+            riskStudentsTable.appendChild(tr);
+          }});
+
+        const invalidStudentsTable = document.getElementById('invalid-students-table');
+        invalidStudentsTable.innerHTML = '';
+        filteredInvalid
+          .filter((row) => row.STATUS === 'Sem marcação')
+          .sort((a, b) => (b.DATA || '').localeCompare(a.DATA || '', 'pt-BR') || a.ALUNO.localeCompare(b.ALUNO, 'pt-BR'))
+          .slice(0, 12)
+          .forEach((row) => {{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${{row.DATA_EXIBICAO}}</td><td>${{row.ALUNO}}</td><td>${{row.DISCIPLINA}}</td>`;
+            invalidStudentsTable.appendChild(tr);
+          }});
+
+        const disciplineProgressTable = document.getElementById('discipline-progress-table');
+        disciplineProgressTable.innerHTML = '';
+        disciplineControl.forEach((row) => {{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${{row.disciplina}}</td>
+            <td>${{row.curso || '-'}}</td>
+            <td>${{row.carga_horaria ?? '-'}}</td>
+            <td>${{row.progresso || '-'}}</td>
+            <td>${{percent(row.percentual || 0)}}</td>
+            <td>${{formatarStatusDisciplina(row.status)}}</td>
+          `;
+          disciplineProgressTable.appendChild(tr);
+        }});
+
+        const disciplineValidationSummary = document.getElementById('discipline-validation-summary');
+        const validationTexts = Object.entries(groupedByCourse).map(([curso, itens]) => {{
+          const ensalamentosCurso = window.disciplinas_por_ensalamento[curso];
+          const ensalamentoPadrao = ensalamentosCurso ? Object.keys(ensalamentosCurso)[0] : null;
+          const progresso = calcularProgressoGeralCurso(itens);
+
+          if (!ensalamentoPadrao) {{
+            return `${{curso}}: ${{percent(progresso.percentual_medio)}} médio, sem validação de ensalamento`;
+          }}
+
+          const validacao = validarEnsalamento(itens, ensalamentoPadrao, curso);
+          return `${{curso}}: ${{percent(progresso.percentual_medio)}} médio, ${{validacao.corretas.length}} corretas, ${{validacao.faltantes.length}} faltantes, ${{validacao.excedentes.length}} excedentes`;
+        }});
+        disciplineValidationSummary.textContent = validationTexts.join(' | ');
 
         const timelineData = Array.from(filtered.reduce((map, row) => {{
           if (!map.has(row.DATA_EXIBICAO)) map.set(row.DATA_EXIBICAO, {{ DATA_EXIBICAO: row.DATA_EXIBICAO, Presente: 0, Ausente: 0 }});
@@ -527,3 +1166,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
